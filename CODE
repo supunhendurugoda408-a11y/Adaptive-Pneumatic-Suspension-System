@@ -1,0 +1,332 @@
+
+
+// ======================================================
+// POTENTIOMETER PINS
+// ======================================================
+
+#define XPOT A6
+#define YPOT A5
+
+// ======================================================
+// PRESSURE SENSOR PINS
+// ======================================================
+
+#define PSFL A0
+#define PSFR A1
+#define PSBL A2
+#define PSBR A3
+
+// ======================================================
+// ENCODER PINS
+// ======================================================
+
+#define FLW 10
+#define FRW 11
+#define BLW 12
+#define BRW 13
+
+// ======================================================
+// RELAY PINS
+// ======================================================
+
+// Supply Valves
+#define FLSV 2
+#define FRSV 3
+#define BLSV 6
+#define BRSV 7
+
+// Release Valves
+#define FLSVR 4
+#define FRSVR 5
+#define BLSVR 8
+#define BRSVR 9
+
+// ======================================================
+// VARIABLES
+// ======================================================
+
+// Potentiometer
+int xValue = 0;
+int yValue = 0;
+
+// Pressure
+float pressureFL = 0;
+float pressureFR = 0;
+float pressureBL = 0;
+float pressureBR = 0;
+
+// Encoder Pulses
+volatile int pulseFL = 0;
+volatile int pulseFR = 0;
+volatile int pulseBL = 0;
+volatile int pulseBR = 0;
+
+// RPM
+float rpmFL = 0;
+float rpmFR = 0;
+float rpmBL = 0;
+float rpmBR = 0;
+
+// Time
+unsigned long previousTime = 0;
+
+// Encoder Pulses Per Revolution
+int pulsesPerRevolution = 20;
+
+void setup() {
+
+  Serial.begin(9600);
+
+  // ==================================================
+  // RELAY OUTPUTS
+  // ==================================================
+
+  pinMode(FLSV, OUTPUT);
+  pinMode(FRSV, OUTPUT);
+  pinMode(FLSVR, OUTPUT);
+  pinMode(FRSVR, OUTPUT);
+
+  pinMode(BLSV, OUTPUT);
+  pinMode(BRSV, OUTPUT);
+  pinMode(BLSVR, OUTPUT);
+  pinMode(BRSVR, OUTPUT);
+
+  // ==================================================
+  // ENCODER INPUTS
+  // ==================================================
+
+  pinMode(FLW, INPUT);
+  pinMode(FRW, INPUT);
+  pinMode(BLW, INPUT);
+  pinMode(BRW, INPUT);
+
+  // ==================================================
+  // RELAYS OFF
+  // ==================================================
+
+  allRelaysOff();
+
+  Serial.println("Adaptive Pneumatic Suspension System");
+  Serial.println("====================================");
+}
+
+void loop() {
+
+  // ==================================================
+  // READ POTENTIOMETERS
+  // ==================================================
+
+  xValue = analogRead(XPOT);
+  yValue = analogRead(YPOT);
+
+  // ==================================================
+  // READ PRESSURE SENSORS
+  // ==================================================
+
+  int sensorFL = analogRead(PSFL);
+  int sensorFR = analogRead(PSFR);
+  int sensorBL = analogRead(PSBL);
+  int sensorBR = analogRead(PSBR);
+
+  // ==================================================
+  // VOLTAGE CONVERSION
+  // ==================================================
+
+  float voltageFL = sensorFL * (5.0 / 1023.0);
+  float voltageFR = sensorFR * (5.0 / 1023.0);
+  float voltageBL = sensorBL * (5.0 / 1023.0);
+  float voltageBR = sensorBR * (5.0 / 1023.0);
+
+  // ==================================================
+  // PRESSURE CONVERSION
+  // ==================================================
+
+  pressureFL = (voltageFL / 5.0 + 0.095) / 0.009;
+  pressureFR = (voltageFR / 5.0 + 0.095) / 0.009;
+  pressureBL = (voltageBL / 5.0 + 0.095) / 0.009;
+  pressureBR = (voltageBR / 5.0 + 0.095) / 0.009;
+
+  // ==================================================
+  // READ ENCODER PULSES
+  // ==================================================
+
+  if (digitalRead(FLW) == HIGH) {
+    pulseFL++;
+    delay(1);
+  }
+
+  if (digitalRead(FRW) == HIGH) {
+    pulseFR++;
+    delay(1);
+  }
+
+  if (digitalRead(BLW) == HIGH) {
+    pulseBL++;
+    delay(1);
+  }
+
+  if (digitalRead(BRW) == HIGH) {
+    pulseBR++;
+    delay(1);
+  }
+
+  // ==================================================
+  // RPM CALCULATION EVERY 1 SECOND
+  // ==================================================
+
+  if (millis() - previousTime >= 1000) {
+
+    rpmFL = (pulseFL * 60.0) / pulsesPerRevolution;
+    rpmFR = (pulseFR * 60.0) / pulsesPerRevolution;
+    rpmBL = (pulseBL * 60.0) / pulsesPerRevolution;
+    rpmBR = (pulseBR * 60.0) / pulsesPerRevolution;
+
+    // ==================================================
+    // PRINT AXIS VALUES
+    // ==================================================
+
+    Serial.print("X Axis: ");
+    Serial.print(xValue);
+
+    Serial.print("   Y Axis: ");
+    Serial.println(yValue);
+
+    // ==================================================
+    // PRINT PRESSURE VALUES
+    // ==================================================
+
+    Serial.print("PSFL: ");
+    Serial.print(pressureFL);
+    Serial.println(" kPa");
+
+    Serial.print("PSFR: ");
+    Serial.print(pressureFR);
+    Serial.println(" kPa");
+
+    Serial.print("PSBL: ");
+    Serial.print(pressureBL);
+    Serial.println(" kPa");
+
+    Serial.print("PSBR: ");
+    Serial.print(pressureBR);
+    Serial.println(" kPa");
+
+    // ==================================================
+    // PRINT RPM VALUES
+    // ==================================================
+
+    Serial.print("FL RPM: ");
+    Serial.println(rpmFL);
+
+    Serial.print("FR RPM: ");
+    Serial.println(rpmFR);
+
+    Serial.print("BL RPM: ");
+    Serial.println(rpmBL);
+
+    Serial.print("BR RPM: ");
+    Serial.println(rpmBR);
+
+    Serial.println("--------------------------------");
+
+    // ==================================================
+    // RESET PULSE COUNTERS
+    // ==================================================
+
+    pulseFL = 0;
+    pulseFR = 0;
+    pulseBL = 0;
+    pulseBR = 0;
+
+    previousTime = millis();
+  }
+
+  // ==================================================
+  // TURN OFF ALL RELAYS FIRST
+  // ==================================================
+
+  allRelaysOff();
+
+  // ==================================================
+  // X AXIS CONTROL
+  // ==================================================
+
+  if (xValue > 300) {
+
+    digitalWrite(FLSV, HIGH);
+    digitalWrite(BLSV, HIGH);
+
+    digitalWrite(FRSVR, HIGH);
+    digitalWrite(BRSVR, HIGH);
+  }
+
+  else if (xValue < 100) {
+
+    digitalWrite(FRSV, HIGH);
+    digitalWrite(BRSV, HIGH);
+
+    digitalWrite(FLSVR, HIGH);
+    digitalWrite(BLSVR, HIGH);
+  }
+
+  // ==================================================
+  // Y AXIS CONTROL
+  // ==================================================
+
+  if (yValue > 300) {
+
+    digitalWrite(FLSV, HIGH);
+    digitalWrite(FRSV, HIGH);
+
+    digitalWrite(BLSVR, HIGH);
+    digitalWrite(BRSVR, HIGH);
+  }
+
+  else if (yValue < 100) {
+
+    digitalWrite(BLSV, HIGH);
+    digitalWrite(BRSV, HIGH);
+
+    digitalWrite(FLSVR, HIGH);
+    digitalWrite(FRSVR, HIGH);
+  }
+
+  // ==================================================
+  // RPM BASED CONTROL
+  // ==================================================
+
+  if (rpmFL > 800) {
+    digitalWrite(FLSV, HIGH);
+  }
+
+  if (rpmFR > 800) {
+    digitalWrite(FRSV, HIGH);
+  }
+
+  if (rpmBL > 800) {
+    digitalWrite(BLSV, HIGH);
+  }
+
+  if (rpmBR > 800) {
+    digitalWrite(BRSV, HIGH);
+  }
+
+  delay(100);
+}
+
+// ======================================================
+// TURN OFF ALL RELAYS
+// ======================================================
+
+void allRelaysOff() {
+
+  digitalWrite(FLSV, LOW);
+  digitalWrite(FRSV, LOW);
+  digitalWrite(FLSVR, LOW);
+  digitalWrite(FRSVR, LOW);
+
+  digitalWrite(BLSV, LOW);
+  digitalWrite(BRSV, LOW);
+  digitalWrite(BLSVR, LOW);
+  digitalWrite(BRSVR, LOW);
+}
